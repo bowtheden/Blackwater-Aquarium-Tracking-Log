@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aquarium Cycle Tracker</title>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- Tank selector bar -->
+  <div class="tank-bar" id="tankBar">
+    <div class="tank-tabs" id="tankTabs"></div>
+    <button class="tank-add-btn" id="addTankBtn" type="button" title="Add a tank">+ New tank</button>
+  </div>
+
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">Aquarist's field log</p>
+      <h1 id="heroTitle">—</h1>
+      <div class="phase-row">
+        <label for="phaseSelect">Phase</label>
+        <select id="phaseSelect">
+          <option value="cycling">Dark start / fishless cycling — no livestock</option>
+          <option value="precycle">Cycled — getting ready for plants &amp; snails</option>
+          <option value="livestock">Livestock present</option>
+        </select>
+        <span class="day-count" id="dayCount"></span>
+      </div>
+      <p class="phase-caption" id="phaseCaption"></p>
+    </div>
+  </header>
+
+  <section class="strip" id="statusStrip" aria-label="Latest reading, at a glance"></section>
+  <section class="grid" id="cardGrid" aria-label="Parameter trends"></section>
+
+  <!-- Add / Edit reading -->
+  <section class="logger">
+    <div class="logger-head">
+      <button class="toggle" id="toggleForm" aria-expanded="false" type="button">+ Add a reading</button>
+      <div class="export-row">
+        <button class="ghost export-btn" id="exportCSV" type="button" title="Download CSV for Google Sheets / Excel">↓ Export CSV</button>
+      </div>
+    </div>
+    <form id="entryForm" class="entry-form hidden">
+      <div class="edit-banner hidden" id="editBanner">
+        <span>Editing entry for <strong id="editDateLabel">—</strong></span>
+        <button type="button" id="cancelEdit" class="cancel-edit-btn">✕ Cancel edit</button>
+      </div>
+      <div class="field">
+        <label for="f-date">Date</label>
+        <input type="date" id="f-date" required>
+      </div>
+      <div class="field">
+        <label for="f-dkh">KH (dKH)</label>
+        <input type="number" step="any" id="f-dkh" inputmode="decimal" placeholder="leave blank to keep">
+      </div>
+      <div class="field">
+        <label for="f-dgh">GH (dGH)</label>
+        <input type="number" step="any" id="f-dgh" inputmode="decimal" placeholder="leave blank to keep">
+      </div>
+      <div class="field">
+        <label for="f-ph">pH</label>
+        <input type="number" step="any" id="f-ph" inputmode="decimal" placeholder="leave blank to keep">
+      </div>
+      <div class="field">
+        <label for="f-nitrite">Nitrite (ppm)</label>
+        <input type="number" step="any" id="f-nitrite" inputmode="decimal" placeholder="leave blank to keep">
+      </div>
+      <div class="field">
+        <label for="f-nitrate">Nitrate (ppm)</label>
+        <input type="number" step="any" id="f-nitrate" inputmode="decimal" placeholder="leave blank to keep">
+      </div>
+      <div class="field">
+        <label for="f-ammonia">Ammonia (ppm)</label>
+        <input type="number" step="any" id="f-ammonia" inputmode="decimal" placeholder="leave blank to keep">
+      </div>
+      <div class="field">
+        <label for="f-temp">Temp (°F)</label>
+        <input type="number" step="any" id="f-temp" inputmode="decimal" placeholder="leave blank to keep">
+      </div>
+      <div class="field field-wide">
+        <label for="f-notes">Notes — what you dosed / changed</label>
+        <textarea id="f-notes" rows="2"></textarea>
+      </div>
+      <div class="form-actions">
+        <button type="submit" id="submitBtn">Save reading</button>
+        <span class="hint" id="formHint">Empty fields keep the previous value for that date.</span>
+        <span id="saveStatus" class="save-status" role="status" aria-live="polite"></span>
+      </div>
+    </form>
+  </section>
+
+  <!-- History log -->
+  <section class="history">
+    <button class="toggle" id="toggleHistory" aria-expanded="false" type="button">▸ Full log (<span id="histCount">0</span> entries)</button>
+    <div id="historyTableWrap" class="hidden"></div>
+  </section>
+
+  <footer class="foot">
+    <button id="resetBtn" class="ghost danger-ghost" type="button">Reset this tank's log</button>
+    <p class="fineprint" id="storageNote">Saved privately in this browser — reopen later and your readings will still be here.</p>
+  </footer>
+</div>
+
+<!-- Add / Edit Tank Modal -->
+<div class="modal-overlay hidden" id="tankModalOverlay">
+  <div class="modal" id="tankModal" role="dialog" aria-labelledby="modalTitle">
+    <h2 id="modalTitle">Add a tank</h2>
+    <form id="tankForm">
+      <div class="field">
+        <label for="tm-name">Tank name</label>
+        <input type="text" id="tm-name" placeholder="e.g. 5 Gal Nano" required>
+      </div>
+      <div class="field">
+        <label for="tm-vol">Volume (gallons) — display only</label>
+        <input type="number" step="any" id="tm-vol" placeholder="5">
+      </div>
+      <p class="modal-section-label">Ideal ranges (optional — leave blank to use defaults)</p>
+      <div class="modal-grid">
+        <div class="field"><label>pH min</label><input type="number" step="any" id="tm-ph-lo" placeholder="6.5"></div>
+        <div class="field"><label>pH max</label><input type="number" step="any" id="tm-ph-hi" placeholder="7.0"></div>
+        <div class="field"><label>KH min (dKH)</label><input type="number" step="any" id="tm-kh-lo" placeholder="2"></div>
+        <div class="field"><label>KH max (dKH)</label><input type="number" step="any" id="tm-kh-hi" placeholder="4"></div>
+        <div class="field"><label>GH min (dGH)</label><input type="number" step="any" id="tm-gh-lo" placeholder="4"></div>
+        <div class="field"><label>GH max (dGH)</label><input type="number" step="any" id="tm-gh-hi" placeholder="8"></div>
+        <div class="field"><label>Temp min (°F)</label><input type="number" step="any" id="tm-temp-lo" placeholder="72"></div>
+        <div class="field"><label>Temp max (°F)</label><input type="number" step="any" id="tm-temp-hi" placeholder="78"></div>
+        <div class="field"><label>Nitrate max (ppm)</label><input type="number" step="any" id="tm-no3-hi" placeholder="10"></div>
+      </div>
+      <div class="field" id="tm-notes-field">
+        <label for="tm-desc">Tank description / notes (optional)</label>
+        <textarea id="tm-desc" rows="2" placeholder="Blackwater setup, neons + cherry shrimp…"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="submit" class="modal-save">Save tank</button>
+        <button type="button" class="modal-cancel" id="cancelTankModal">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Tank context dropdown -->
+<div class="tank-dropdown hidden" id="tankDropdown" role="menu">
+  <button class="td-item" id="tdEdit"   type="button">✎ Edit tank settings</button>
+  <button class="td-item" id="tdCopy"   type="button">⊕ Duplicate tank (copy settings + data)</button>
+  <button class="td-item" id="tdCopyBlank" type="button">⊕ Duplicate tank (settings only, no data)</button>
+  <div class="td-divider"></div>
+  <button class="td-item td-danger" id="tdDelete" type="button">✕ Delete this tank</button>
+</div>
+
+<style>
+  :root{
+    --bg-deep:#15100c;
+    --bg-panel:#1d1610;
+    --bg-panel-2:#241c14;
+    --hairline:rgba(237,226,208,0.12);
+    --hairline-strong:rgba(237,226,208,0.22);
+    --tannin:#8a5a2b;
+    --tannin-glow:#d39a4e;
+    --parchment:#ede2d0;
+    --parchment-dim:#b8ab94;
+    --good:#5fae8c;
+    --watch:#d9a441;
+    --danger:#c1502f;
+    --expected:#7b8fae;
+    --font-display:"Iowan Old Style","Palatino Linotype","URW Palladio",Palatino,Georgia,serif;
+    --font-body:"Avenir Next","Century Gothic",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --font-mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  }
+
+  body { margin:0; background:#0d0a07; }
+
+  #app{
+    background:var(--bg-deep);
+    color:var(--parchment);
+    font-family:var(--font-body);
+    border-radius:14px;
+    overflow:hidden;
+    max-width:1020px;
+    margin:0 auto;
+    box-shadow:0 1px 0 var(--hairline-strong) inset;
+  }
+  #app *{box-sizing:border-box;}
+  #app button, #app input, #app select, #app textarea{font-family:inherit;color:inherit;}
+  #app :focus-visible{outline:2px solid var(--tannin-glow); outline-offset:2px; border-radius:4px;}
+
+  /* ── TANK BAR ── */
+  .tank-bar{
+    display:flex; align-items:stretch; gap:0;
+    background:var(--bg-panel-2);
+    border-bottom:1px solid var(--hairline);
+    overflow-x:auto;
+  }
+  .tank-tabs{ display:flex; flex:1; }
+  .tank-tab-wrap{ display:flex; align-items:stretch; position:relative; }
+  .tank-tab-wrap.active-wrap{ background:var(--bg-deep); border-bottom:2px solid var(--tannin-glow); }
+  .tank-tab{
+    background:none; border:none; border-right:none;
+    color:var(--parchment-dim); font-size:12.5px; padding:10px 14px 10px 18px;
+    cursor:pointer; white-space:nowrap; transition:color .15s, background .15s;
+  }
+  .tank-tab:hover{ color:var(--parchment); }
+  .tank-tab-wrap:not(.active-wrap):hover{ background:var(--bg-panel); }
+  .tank-tab-wrap:not(.active-wrap){ border-right:1px solid var(--hairline); border-bottom:2px solid transparent; }
+  .tank-tab.active{ color:var(--tannin-glow); }
+  .tank-tab .tank-vol{ font-size:10px; color:var(--parchment-dim); margin-left:5px; }
+
+  /* ⋯ menu button on active tab */
+  .tank-menu-btn{
+    background:none; border:none; border-left:1px solid var(--hairline);
+    color:var(--parchment-dim); font-size:14px; padding:0 10px;
+    cursor:pointer; line-height:1; letter-spacing:1px;
+    transition:color .15s, background .15s;
+  }
+  .tank-menu-btn:hover{ color:var(--tannin-glow); background:rgba(211,154,78,0.08); }
+
+  .tank-add-btn{
+    background:none; border:none; border-left:1px solid var(--hairline);
+    color:var(--tannin-glow); font-size:12px; padding:10px 16px;
+    cursor:pointer; white-space:nowrap;
+  }
+  .tank-add-btn:hover{ background:var(--bg-panel); }
+
+  /* ── DROPDOWN ── */
+  .tank-dropdown{
+    position:fixed; z-index:200;
+    background:var(--bg-panel-2); border:1px solid var(--hairline-strong);
+    border-radius:10px; padding:6px; min-width:230px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.5);
+    display:flex; flex-direction:column; gap:2px;
+  }
+  .tank-dropdown.hidden{ display:none; }
+  .td-item{
+    background:none; border:none; text-align:left;
+    color:var(--parchment); font-size:13px; padding:8px 12px;
+    cursor:pointer; border-radius:6px; white-space:nowrap;
+  }
+  .td-item:hover{ background:rgba(237,226,208,0.07); }
+  .td-danger{ color:var(--danger) !important; }
+  .td-danger:hover{ background:rgba(193,80,47,0.12) !important; }
+  .td-divider{ height:1px; background:var(--hairline); margin:4px 0; }
+
+  /* ── HERO ── */
+  .hero{
+    padding:28px 24px 20px;
+    background:
+      radial-gradient(120% 140% at 12% -10%, rgba(211,154,78,0.28), transparent 55%),
+      linear-gradient(180deg, var(--bg-panel-2), var(--bg-deep));
+    border-bottom:1px solid var(--hairline);
+  }
+  .hero-inner{max-width:760px; display:flex; flex-wrap:wrap; gap:0; flex-direction:column;}
+  .hero-title-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+  .eyebrow{
+    font-family:var(--font-mono); letter-spacing:.14em; text-transform:uppercase;
+    font-size:11px; color:var(--tannin-glow); margin:0 0 8px;
+  }
+  .hero h1{
+    font-family:var(--font-display); font-weight:600;
+    font-size:clamp(20px,3.5vw,28px); margin:0; color:var(--parchment);
+  }
+  .hero-title-suffix{ color:var(--parchment-dim); font-weight:400; }
+  /* Inline editable name part of title */
+  #heroNameEditable{
+    display:inline; cursor:text;
+    border-bottom:1px dashed transparent;
+    transition:border-color .15s;
+    border-radius:2px;
+  }
+  #heroNameEditable:hover{ border-bottom-color:var(--tannin-glow); }
+  #heroNameEditable:focus{
+    outline:none;
+    border-bottom:1px solid var(--tannin-glow);
+    background:rgba(211,154,78,0.08);
+    border-radius:2px;
+    padding:0 2px;
+  }
+  .hero-name-hint{
+    font-family:var(--font-mono); font-size:10px; color:var(--tannin-glow);
+    opacity:0; transition:opacity .2s; margin-left:8px; vertical-align:middle;
+  }
+  .hero-title-row:hover .hero-name-hint{ opacity:1; }
+  .edit-tank-btn{
+    background:none; border:1px solid var(--hairline-strong); color:var(--parchment-dim);
+    border-radius:6px; padding:4px 10px; font-size:11.5px; cursor:pointer;
+  }
+  .edit-tank-btn:hover{ border-color:var(--tannin-glow); color:var(--tannin-glow); }
+  .phase-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .phase-row label{font-size:12px; color:var(--parchment-dim);}
+  #phaseSelect{
+    background:var(--bg-panel); border:1px solid var(--hairline-strong);
+    border-radius:8px; padding:7px 10px; font-size:13px; max-width:100%;
+  }
+  .day-count{
+    font-family:var(--font-mono); font-size:12px; color:var(--parchment-dim);
+    padding:4px 9px; border:1px solid var(--hairline-strong); border-radius:20px;
+  }
+  .phase-caption{
+    margin:12px 0 0; font-size:13px; line-height:1.5;
+    color:var(--parchment-dim); max-width:62ch;
+  }
+
+  /* ── STATUS STRIP ── */
+  .strip{
+    display:flex; gap:14px; padding:18px 24px;
+    overflow-x:auto; border-bottom:1px solid var(--hairline);
+  }
+  .vial-chip{
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    background:none; border:none; cursor:pointer; padding:4px 2px; flex:0 0 auto;
+  }
+  .vial-chip .vlabel{font-family:var(--font-mono); font-size:11px; color:var(--parchment-dim);}
+  .vial-chip .vvalue{font-family:var(--font-mono); font-size:11px; color:var(--parchment);}
+
+  /* ── CARDS ── */
+  .grid{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+    gap:14px; padding:20px 24px;
+  }
+  .card{
+    background:var(--bg-panel); border:1px solid var(--hairline);
+    border-radius:12px; padding:14px 16px 12px;
+    animation:rise .35s ease both;
+  }
+  @media (prefers-reduced-motion:reduce){ .card{animation:none;} }
+  @keyframes rise{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
+  .card-head{display:flex; justify-content:space-between; align-items:baseline; gap:8px;}
+  .card-head h3{font-family:var(--font-display); font-size:15px; font-weight:600; margin:0; color:var(--parchment);}
+  .card-value{font-family:var(--font-mono); font-size:20px; color:var(--parchment);}
+  .card-status{font-size:11.5px; margin:6px 0 2px; display:flex; align-items:center; gap:6px;}
+  .dot{width:7px; height:7px; border-radius:50%; flex:0 0 auto;}
+  .dot.good{background:var(--good);}
+  .dot.watch{background:var(--watch);}
+  .dot.danger{background:var(--danger);}
+  .dot.expected{background:var(--expected);}
+  .dot.unknown{background:var(--parchment-dim);}
+  .status-text{color:var(--parchment-dim);}
+  .card-caption{font-size:11.5px; color:var(--parchment-dim); margin-top:8px; line-height:1.45;}
+  .card svg{width:100%; height:auto; display:block; margin-top:6px;}
+
+  /* ── LOGGER ── */
+  .logger, .history{padding:6px 24px 18px;}
+  .logger-head{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .logger-head .toggle{ flex:1; }
+  .export-row{ display:flex; gap:8px; }
+  .export-btn{
+    font-size:12px; padding:7px 14px; white-space:nowrap;
+    border-color:var(--tannin); color:var(--tannin-glow);
+  }
+  .export-btn:hover{ border-color:var(--tannin-glow); background:var(--bg-panel); }
+
+  .toggle{
+    background:none; border:1px solid var(--hairline-strong); color:var(--parchment);
+    border-radius:8px; padding:9px 14px; font-size:13px; cursor:pointer; text-align:left;
+  }
+  .toggle:hover{border-color:var(--tannin-glow);}
+
+  .entry-form{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:12px; margin-top:14px;
+    background:var(--bg-panel); border:1px solid var(--hairline);
+    border-radius:12px; padding:16px;
+  }
+  .entry-form.hidden, #historyTableWrap.hidden{display:none;}
+
+  /* Edit banner */
+  .edit-banner{
+    grid-column:1/-1; background:rgba(211,154,78,0.12);
+    border:1px solid rgba(211,154,78,0.3); border-radius:8px;
+    padding:8px 14px; display:flex; align-items:center;
+    justify-content:space-between; gap:12px;
+    font-size:12.5px; color:var(--tannin-glow);
+  }
+  .edit-banner.hidden{ display:none; }
+  .cancel-edit-btn{
+    background:none; border:1px solid rgba(211,154,78,0.4);
+    color:var(--tannin-glow); border-radius:6px;
+    padding:3px 10px; font-size:11.5px; cursor:pointer;
+  }
+  .cancel-edit-btn:hover{ background:rgba(211,154,78,0.15); }
+
+  .field{display:flex; flex-direction:column; gap:5px;}
+  .field-wide{grid-column:1/-1;}
+  .field label{font-size:11.5px; color:var(--parchment-dim);}
+  .field input, .field textarea{
+    background:var(--bg-deep); border:1px solid var(--hairline-strong); border-radius:7px;
+    padding:8px 9px; font-size:14px; color:var(--parchment); width:100%; resize:vertical;
+  }
+  .field input::placeholder, .field textarea::placeholder{ color:var(--parchment-dim); font-size:12px; opacity:.7; }
+  .form-actions{grid-column:1/-1; display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:4px;}
+  .form-actions button[type=submit]{
+    background:var(--tannin); color:var(--parchment); border:none;
+    border-radius:8px; padding:9px 16px; font-size:13.5px; font-weight:600; cursor:pointer;
+  }
+  .form-actions button[type=submit]:hover{background:var(--tannin-glow); color:#1d1610;}
+  .hint{font-size:11.5px; color:var(--parchment-dim);}
+  .save-status{font-size:12px; color:var(--good);}
+
+  /* ── HISTORY TABLE ── */
+  table.log{width:100%; border-collapse:collapse; margin-top:14px; font-size:12.5px;}
+  table.log th, table.log td{padding:7px 8px; border-bottom:1px solid var(--hairline); text-align:left; vertical-align:top;}
+  table.log th{color:var(--parchment-dim); font-weight:600; font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.04em;}
+  table.log td{font-family:var(--font-mono);}
+  table.log td.notes{font-family:var(--font-body); color:var(--parchment-dim); max-width:200px;}
+  table.log tr:hover td{ background:rgba(237,226,208,0.03); }
+  .btn-edit{
+    background:none; border:1px solid var(--hairline-strong); color:var(--tannin-glow);
+    border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer; margin-right:4px;
+  }
+  .btn-edit:hover{ border-color:var(--tannin-glow); background:rgba(211,154,78,0.08); }
+  .btn-del{
+    background:none; border:1px solid var(--hairline-strong); color:var(--parchment-dim);
+    border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;
+  }
+  .btn-del:hover{border-color:var(--danger); color:var(--danger);}
+  .table-scroll{overflow-x:auto;}
+
+  /* ── FOOTER ── */
+  .foot{padding:14px 24px 22px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; border-top:1px solid var(--hairline);}
+  .ghost{
+    background:none; border:1px solid var(--hairline-strong); color:var(--parchment-dim);
+    border-radius:8px; padding:7px 12px; font-size:12px; cursor:pointer;
+  }
+  .ghost:hover{color:var(--parchment); border-color:var(--tannin-glow);}
+  .danger-ghost:hover{ border-color:var(--danger) !important; color:var(--danger) !important; }
+  .fineprint{font-size:11.5px; color:var(--parchment-dim); margin:0;}
+
+  /* ── MODAL ── */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100;
+    display:flex; align-items:center; justify-content:center; padding:16px;
+  }
+  .modal-overlay.hidden{ display:none; }
+  .modal{
+    background:var(--bg-panel-2); border:1px solid var(--hairline-strong);
+    border-radius:14px; padding:24px; width:100%; max-width:520px;
+    max-height:90vh; overflow-y:auto;
+  }
+  .modal h2{
+    font-family:var(--font-display); font-size:20px; font-weight:600;
+    color:var(--parchment); margin:0 0 18px;
+  }
+  .modal-section-label{
+    font-family:var(--font-mono); font-size:11px; text-transform:uppercase;
+    letter-spacing:.1em; color:var(--tannin-glow); margin:14px 0 8px; grid-column:1/-1;
+  }
+  .modal-grid{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px;
+    margin-bottom:12px;
+  }
+  .modal-actions{display:flex; gap:10px; margin-top:18px;}
+  .modal-save{
+    background:var(--tannin); color:var(--parchment); border:none;
+    border-radius:8px; padding:9px 18px; font-size:13.5px; font-weight:600; cursor:pointer;
+  }
+  .modal-save:hover{ background:var(--tannin-glow); color:#1d1610; }
+  .modal-cancel{
+    background:none; border:1px solid var(--hairline-strong); color:var(--parchment-dim);
+    border-radius:8px; padding:9px 14px; font-size:13px; cursor:pointer;
+  }
+  .modal-cancel:hover{ border-color:var(--tannin-glow); color:var(--parchment); }
+  .modal .field{ margin-bottom:10px; }
+  .modal .field input, .modal .field textarea{
+    background:var(--bg-deep); border:1px solid var(--hairline-strong); border-radius:7px;
+    padding:8px 9px; font-size:14px; color:var(--parchment); width:100%;
+  }
+</style>
+
+<script>
+(function(){
+
+  // ─── DEFAULT PARAMS ─────────────────────────────────────────────────────────
+  const DEFAULT_PARAMS = [
+    {key:'ph',      label:'pH',              short:'pH',  unit:'',     decimals:2,
+     good:[6.5,7.0], hardLow:6.0,
+     caption:'Target 6.5–7.0 — the overlap zone for neons and cherry shrimp.'},
+    {key:'dkh',     label:'KH (alkalinity)', short:'KH',  unit:' dKH', decimals:1,
+     good:[2,4], hardLow:1.5,
+     caption:'2–4 dKH ongoing. Needs to stay near 4 dKH while bacteria are still establishing.'},
+    {key:'dgh',     label:'GH (hardness)',   short:'GH',  unit:' dGH', decimals:1,
+     good:[4,8], hardLow:4, hardHigh:10,
+     caption:'4–8 dGH. Below 4 risks failed shrimp molts; above ~10 stresses neons over the long run.'},
+    {key:'ammonia', label:'Ammonia',         short:'NH₃', unit:' ppm', decimals:2,
+     good:[0,0], hardHigh:0,
+     caption:'Must read 0 once any animal is in. Rising and falling on its own is normal mid-cycle.'},
+    {key:'nitrite', label:'Nitrite',         short:'NO₂', unit:' ppm', decimals:2,
+     good:[0,0], hardHigh:0,
+     caption:'Must read 0 once any animal is in. A mid-cycle spike means the bacteria are working.'},
+    {key:'nitrate', label:'Nitrate',         short:'NO₃', unit:' ppm', decimals:1,
+     good:[0,10], hardHigh:20,
+     caption:'Under 10 ppm with shrimp in residence; under 20 ppm before anything goes in.'},
+    {key:'temp',    label:'Temperature',     short:'°F',  unit:'°F',   decimals:0,
+     good:[72,78], hardHigh:80,
+     caption:'72–78°F is the shared comfort zone for neon tetras and cherry shrimp.'}
+  ];
+
+  const PHASE_CAPTIONS = {
+    cycling:   "No animals in yet. Ammonia, nitrite, and nitrate are expected to swing around while the substrate leaches and bacteria build up — don't chase those three right now. GH, KH, pH, and temperature still matter on their own timeline.",
+    precycle:  "Cycle should be holding at 0 ammonia / 0 nitrite with nitrate climbing on its own. This is the window to bring nitrate down and get GH/KH dialed in before plants, snails, or shrimp go in.",
+    livestock: "Animals are in the tank. Ammonia and nitrite need to stay at 0 — any reading above that is urgent, not a normal swing."
+  };
+
+  // ─── TANK STORAGE ───────────────────────────────────────────────────────────
+  const TANKS_KEY = 'aqtracker-tanks-v2';
+
+  const SEED_TANKS = [
+    {
+      id: 'flex15',
+      name: 'Flex 15',
+      volume: 15,
+      desc: 'Blackwater SLESS dark-start cycle — neons + cherry shrimp',
+      phase: 'cycling',
+      paramOverrides: {},
+      entries: [
+        {date:'2026-06-14', dkh:2, dgh:17, ph:7.8, nitrite:0, nitrate:2.5,   ammonia:0.5, temp:84, notes:'Dosed Prime, Microbacter, Stability, Aqua Clear'},
+        {date:'2026-06-15', dkh:4, dgh:18, ph:6.6, nitrite:0, nitrate:60,    ammonia:0.5, temp:76, notes:'Added more wood, lava rock, substrate, leaf litter, pothos, more SafeStart + Microbacter, Seachem Matrix + biostones, ~1 tsp aquarium salt, baking soda for KH'},
+        {date:'2026-06-16', dkh:4, dgh:12, ph:6.8, nitrite:0, nitrate:120,   ammonia:3,   temp:78, notes:"Ammonia source (Dr. Tim's), 3/4 tsp baking soda, mulm from other tanks, Bacter AE, Seachem Stability, small airstone"}
+      ]
+    },
+    {
+      id: 'nano5',
+      name: '5 Gal Nano',
+      volume: 5,
+      desc: 'Second dark-start cycle',
+      phase: 'cycling',
+      paramOverrides: {},
+      entries: []
+    }
+  ];
+
+  let tanks = [];
+  let currentTankId = null;
+  let storageOK = true;
+  let editingDate = null; // null = new entry, string = editing existing
+
+  // ─── HELPERS ────────────────────────────────────────────────────────────────
+  const hasStorage = () => {
+    try { localStorage.setItem('__t__','1'); localStorage.removeItem('__t__'); return true; }
+    catch(e){ return false; }
+  };
+
+  function saveTanks(){
+    if(!hasStorage()){ storageOK=false; return false; }
+    try{ localStorage.setItem(TANKS_KEY, JSON.stringify(tanks)); return true; }
+    catch(e){ storageOK=false; return false; }
+  }
+
+  function loadTanks(){
+    if(hasStorage()){
+      try{
+        const raw = localStorage.getItem(TANKS_KEY);
+        if(raw){ tanks = JSON.parse(raw); return; }
+      }catch(e){ /* first load */ }
+    } else { storageOK=false; }
+    tanks = JSON.parse(JSON.stringify(SEED_TANKS));
+    saveTanks();
+  }
+
+  function currentTank(){ return tanks.find(t=>t.id===currentTankId) || tanks[0]; }
+
+  function paramsForTank(tank){
+    return DEFAULT_PARAMS.map(p=>{
+      const ov = (tank.paramOverrides||{})[p.key];
+      if(!ov) return p;
+      return Object.assign({}, p, {
+        good: [
+          ov.goodLo!=null ? ov.goodLo : p.good[0],
+          ov.goodHi!=null ? ov.goodHi : p.good[1]
+        ],
+        hardHigh: ov.hardHigh!=null ? ov.hardHigh : p.hardHigh,
+        hardLow:  ov.hardLow!=null  ? ov.hardLow  : p.hardLow,
+      });
+    });
+  }
+
+  function fmt(v,d){ return (v===null||v===undefined||v===''||isNaN(v)) ? '—' : Number(v).toFixed(d); }
+  function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+  function genId(){ return 'tank-'+Math.random().toString(36).slice(2,8); }
+
+  function todayLocal(){
+    const d=new Date();
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+
+  function prettyDate(iso){
+    const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const p=iso.split('-').map(Number);
+    return MONTHS[p[1]-1]+' '+p[2]+', '+p[0];
+  }
+
+  function dayNumber(iso, firstIso){
+    const a=iso.split('-').map(Number), b=firstIso.split('-').map(Number);
+    const da=new Date(a[0],a[1]-1,a[2]), db=new Date(b[0],b[1]-1,b[2]);
+    return Math.round((da-db)/86400000)+1;
+  }
+
+  function sortedEntries(tank){
+    return (tank.entries||[]).slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+  }
+
+  function getStatus(p, v, ph){
+    if(v===null||v===undefined||v===''||isNaN(v)) return {level:'unknown', text:'no reading yet'};
+    const isN=(p.key==='ammonia'||p.key==='nitrite'||p.key==='nitrate');
+    if(isN && ph==='cycling'){
+      if(p.key==='nitrate'){
+        if(v>160) return {level:'watch', text:"past the test kit's reliable range — re-test, but no risk with no livestock yet"};
+        return {level:'expected', text:'climbing is normal while substrate leaches and bacteria build up'};
+      }
+      if(v>6) return {level:'watch', text:'higher than typical — hold off on more ammonia source'};
+      return {level:'expected', text:'expected during a fishless cycle with no livestock'};
+    }
+    const inGood=v>=p.good[0]&&v<=p.good[1];
+    if(inGood) return {level:'good', text:'in target range'};
+    const hardLowHit=(p.hardLow!=null&&v<p.hardLow);
+    const hardHighHit=(p.hardHigh!=null&&v>p.hardHigh);
+    if(hardLowHit||hardHighHit){
+      if(ph==='cycling') return {level:'watch', text:'outside target — plan to fix before stocking'};
+      return {level:'danger', text:hardLowHit?'below the safe floor for livestock':'above the safe ceiling for livestock'};
+    }
+    return {level:'watch', text:'a bit outside target'};
+  }
+
+  // ─── CHART SVG ──────────────────────────────────────────────────────────────
+  function chartSVG(p, tank){
+    const list=sortedEntries(tank);
+    const vals=list.map(e=>e[p.key]).filter(v=>v!==null&&v!==undefined&&v!==''&&!isNaN(v));
+    const w=300,h=128,padL=30,padR=10,padT=10,padB=18;
+    if(!vals.length){
+      return '<svg viewBox="0 0 '+w+' '+h+'"><text x="'+w/2+'" y="'+h/2+'" fill="var(--parchment-dim)" font-size="11" text-anchor="middle">no data</text></svg>';
+    }
+    let lo=Math.min.apply(null,vals), hi=Math.max.apply(null,vals);
+    lo=Math.min(lo,p.good[0]); hi=Math.max(hi,p.good[1]);
+    if(p.hardLow!=null) lo=Math.min(lo,p.hardLow);
+    if(p.hardHigh!=null) hi=Math.max(hi,p.hardHigh);
+    let span=hi-lo; if(span<=0) span=Math.max(1,Math.abs(hi)*0.2,1);
+    const pad=span*0.18; lo-=pad; hi+=pad; lo=Math.max(0,lo);
+    const n=list.length;
+    const xPos=i=>n<=1?(padL+(w-padL-padR)/2):padL+(i/(n-1))*(w-padL-padR);
+    const yPos=v=>padT+(1-((v-lo)/(hi-lo)))*(h-padT-padB);
+    const bandTop=clamp(p.good[1],lo,hi), bandBot=clamp(p.good[0],lo,hi);
+    let svg='<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">';
+    svg+='<rect x="'+padL+'" y="'+yPos(bandTop)+'" width="'+(w-padL-padR)+'" height="'+Math.max(0,(yPos(bandBot)-yPos(bandTop)))+'" fill="var(--good)" opacity="0.14"/>';
+    let pts=[];
+    list.forEach((e,i)=>{
+      const v=e[p.key];
+      if(v===null||v===undefined||v===''||isNaN(v)) return;
+      pts.push(xPos(i).toFixed(1)+','+yPos(v).toFixed(1));
+    });
+    if(pts.length>1){
+      svg+='<polyline points="'+pts.join(' ')+'" fill="none" stroke="var(--tannin-glow)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    }
+    list.forEach((e,i)=>{
+      const v=e[p.key];
+      if(v===null||v===undefined||v===''||isNaN(v)) return;
+      const ph=tank.phase||'cycling';
+      const st=getStatus(p,v,ph);
+      const color=st.level==='good'?'var(--good)':st.level==='danger'?'var(--danger)':st.level==='watch'?'var(--watch)':st.level==='expected'?'var(--expected)':'var(--parchment-dim)';
+      const r=(i===n-1)?4:2.6;
+      svg+='<circle cx="'+xPos(i).toFixed(1)+'" cy="'+yPos(v).toFixed(1)+'" r="'+r+'" fill="'+color+'" stroke="var(--bg-panel)" stroke-width="1"/>';
+    });
+    svg+='<text x="2" y="'+(yPos(hi)+4)+'" fill="var(--parchment-dim)" font-size="9" font-family="var(--font-mono)">'+fmt(hi,p.decimals)+'</text>';
+    svg+='<text x="2" y="'+(yPos(lo)+2)+'" fill="var(--parchment-dim)" font-size="9" font-family="var(--font-mono)">'+fmt(lo,p.decimals)+'</text>';
+    svg+='</svg>';
+    return svg;
+  }
+
+  function vialIconSVG(level){
+    const color=level==='good'?'var(--good)':level==='danger'?'var(--danger)':level==='watch'?'var(--watch)':level==='expected'?'var(--expected)':'var(--parchment-dim)';
+    return '<svg width="20" height="38" viewBox="0 0 20 38">'+
+      '<rect x="5" y="2" width="10" height="30" rx="5" fill="var(--bg-deep)" stroke="var(--hairline-strong)"/>'+
+      '<path d="M6 22 a4 4 0 0 0 8 0 V30 a4 4 0 0 1 -8 0 Z" fill="'+color+'"/>'+
+      '<rect x="3" y="33" width="14" height="3" rx="1.5" fill="var(--hairline-strong)"/>'+
+      '</svg>';
+  }
+
+  function escapeHTML(s){
+    return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ─── RENDER ─────────────────────────────────────────────────────────────────
+  function renderTankTabs(){
+    const tabs=document.getElementById('tankTabs');
+    tabs.innerHTML=tanks.map(t=>{
+      const active=t.id===currentTankId?'active':'';
+      const vol=t.volume?'<span class="tank-vol">'+t.volume+' gal</span>':'';
+      const menu=t.id===currentTankId
+        ? '<button class="tank-menu-btn" data-menu="'+t.id+'" type="button" title="Tank options" aria-label="Tank options">⋯</button>'
+        : '';
+      return '<span class="tank-tab-wrap'+(t.id===currentTankId?' active-wrap':'')+'">'+
+        '<button class="tank-tab '+active+'" data-tank="'+t.id+'" type="button">'+escapeHTML(t.name)+vol+'</button>'+
+        menu+
+        '</span>';
+    }).join('');
+  }
+
+  function renderHero(){
+    const tank=currentTank();
+    // Build title: editable name + static suffix
+    const suffix=(tank.volume?' — '+tank.volume+' gal':'')+(tank.desc?' — '+tank.desc:'');
+    document.getElementById('heroTitle').innerHTML=
+      '<span id="heroNameEditable" contenteditable="true" spellcheck="false" data-tankid="'+tank.id+'" title="Click to rename">'+escapeHTML(tank.name)+'</span>'+
+      (suffix?'<span class="hero-title-suffix">'+escapeHTML(suffix)+'</span>':'')+
+      '<span class="hero-name-hint">click to rename</span>';
+    document.getElementById('phaseCaption').textContent=PHASE_CAPTIONS[tank.phase||'cycling'];
+    document.getElementById('phaseSelect').value=tank.phase||'cycling';
+    const list=sortedEntries(tank);
+    if(list.length){
+      const n=dayNumber(list[list.length-1].date, list[0].date);
+      document.getElementById('dayCount').textContent='Day '+n+' of tracking';
+    } else {
+      document.getElementById('dayCount').textContent='';
+    }
+    // Wire inline rename after render
+    wireHeroRename();
+  }
+
+  function renderStrip(){
+    const tank=currentTank();
+    const list=sortedEntries(tank);
+    const latest=list[list.length-1]||{};
+    const params=paramsForTank(tank);
+    const ph=tank.phase||'cycling';
+    const strip=document.getElementById('statusStrip');
+    strip.innerHTML=params.map(p=>{
+      const v=latest[p.key];
+      const st=getStatus(p,v,ph);
+      return '<button class="vial-chip" data-jump="'+p.key+'" type="button">'+
+        vialIconSVG(st.level)+
+        '<span class="vlabel">'+p.short+'</span>'+
+        '<span class="vvalue">'+fmt(v,p.decimals)+'</span>'+
+        '</button>';
+    }).join('');
+  }
+
+  function renderCards(){
+    const tank=currentTank();
+    const list=sortedEntries(tank);
+    const latest=list[list.length-1]||{};
+    const params=paramsForTank(tank);
+    const ph=tank.phase||'cycling';
+    const grid=document.getElementById('cardGrid');
+    grid.innerHTML=params.map(p=>{
+      const v=latest[p.key];
+      const st=getStatus(p,v,ph);
+      return '<article class="card" id="card-'+p.key+'">'+
+        '<div class="card-head"><h3>'+p.label+'</h3><span class="card-value">'+fmt(v,p.decimals)+p.unit+'</span></div>'+
+        '<div class="card-status"><span class="dot '+st.level+'"></span><span class="status-text">'+st.text+'</span></div>'+
+        chartSVG(p,tank)+
+        '<p class="card-caption">'+p.caption+'</p>'+
+        '</article>';
+    }).join('');
+  }
+
+  function renderHistory(){
+    const tank=currentTank();
+    const list=sortedEntries(tank).slice().reverse();
+    document.getElementById('histCount').textContent=list.length;
+    const wrap=document.getElementById('historyTableWrap');
+    if(!list.length){ wrap.innerHTML='<p class="fineprint" style="margin-top:12px">No entries yet — add the first one above.</p>'; return; }
+    let rows=list.map(e=>{
+      return '<tr data-date="'+e.date+'">'+
+        '<td>'+prettyDate(e.date)+'</td>'+
+        '<td>'+fmt(e.dkh,1)+'</td>'+
+        '<td>'+fmt(e.dgh,1)+'</td>'+
+        '<td>'+fmt(e.ph,2)+'</td>'+
+        '<td>'+fmt(e.nitrite,2)+'</td>'+
+        '<td>'+fmt(e.nitrate,1)+'</td>'+
+        '<td>'+fmt(e.ammonia,2)+'</td>'+
+        '<td>'+fmt(e.temp,0)+'</td>'+
+        '<td class="notes">'+(e.notes?escapeHTML(e.notes):'')+'</td>'+
+        '<td>'+
+          '<button class="btn-edit" type="button" data-edit="'+e.date+'">edit</button>'+
+          '<button class="btn-del" type="button" data-del="'+e.date+'">remove</button>'+
+        '</td>'+
+        '</tr>';
+    }).join('');
+    wrap.innerHTML='<div class="table-scroll"><table class="log">'+
+      '<thead><tr><th>Date</th><th>KH</th><th>GH</th><th>pH</th><th>NO₂</th><th>NO₃</th><th>NH₃</th><th>°F</th><th>Notes</th><th></th></tr></thead>'+
+      '<tbody>'+rows+'</tbody></table></div>';
+  }
+
+  function renderAll(){
+    renderTankTabs();
+    renderHero();
+    renderStrip();
+    renderCards();
+    renderHistory();
+  }
+
+  // ─── FORM: LOAD EXISTING ENTRY FOR EDIT ─────────────────────────────────────
+  function loadEntryIntoForm(date){
+    const tank=currentTank();
+    const entry=tank.entries.find(e=>e.date===date);
+    if(!entry) return;
+    editingDate=date;
+
+    const form=document.getElementById('entryForm');
+    form.classList.remove('hidden');
+    document.getElementById('toggleForm').setAttribute('aria-expanded','true');
+
+    document.getElementById('f-date').value=date;
+    document.getElementById('f-dkh').value=entry.dkh!=null&&!isNaN(entry.dkh)?entry.dkh:'';
+    document.getElementById('f-dgh').value=entry.dgh!=null&&!isNaN(entry.dgh)?entry.dgh:'';
+    document.getElementById('f-ph').value=entry.ph!=null&&!isNaN(entry.ph)?entry.ph:'';
+    document.getElementById('f-nitrite').value=entry.nitrite!=null&&!isNaN(entry.nitrite)?entry.nitrite:'';
+    document.getElementById('f-nitrate').value=entry.nitrate!=null&&!isNaN(entry.nitrate)?entry.nitrate:'';
+    document.getElementById('f-ammonia').value=entry.ammonia!=null&&!isNaN(entry.ammonia)?entry.ammonia:'';
+    document.getElementById('f-temp').value=entry.temp!=null&&!isNaN(entry.temp)?entry.temp:'';
+    document.getElementById('f-notes').value=entry.notes||'';
+
+    document.getElementById('editBanner').classList.remove('hidden');
+    document.getElementById('editDateLabel').textContent=prettyDate(date);
+    document.getElementById('submitBtn').textContent='Update entry';
+    document.getElementById('formHint').textContent='All fields pre-filled from the original entry. Clear any you want to blank out.';
+
+    form.scrollIntoView({behavior:'smooth', block:'center'});
+  }
+
+  function resetFormToAdd(){
+    editingDate=null;
+    document.getElementById('editBanner').classList.add('hidden');
+    document.getElementById('submitBtn').textContent='Save reading';
+    document.getElementById('formHint').textContent='Empty fields keep the previous value for that date.';
+    document.getElementById('entryForm').reset();
+    document.getElementById('f-date').value=todayLocal();
+  }
+
+  // ─── FORM SUBMIT ────────────────────────────────────────────────────────────
+  function flashSave(msg, isError){
+    const el=document.getElementById('saveStatus');
+    el.textContent=msg;
+    el.style.color=isError?'var(--watch)':'var(--good)';
+    setTimeout(()=>{ if(el.textContent===msg) el.textContent=''; }, 3500);
+  }
+
+  function handleSubmit(ev){
+    ev.preventDefault();
+    const tank=currentTank();
+    const date=document.getElementById('f-date').value||todayLocal();
+
+    const raw={
+      dkh:     document.getElementById('f-dkh').value,
+      dgh:     document.getElementById('f-dgh').value,
+      ph:      document.getElementById('f-ph').value,
+      nitrite: document.getElementById('f-nitrite').value,
+      nitrate: document.getElementById('f-nitrate').value,
+      ammonia: document.getElementById('f-ammonia').value,
+      temp:    document.getElementById('f-temp').value,
+      notes:   document.getElementById('f-notes').value || ''
+    };
+
+    // Find existing entry for this date to merge with
+    const keys=['dkh','dgh','ph','nitrite','nitrate','ammonia','temp'];
+    let idx=tank.entries.findIndex(e=>e.date===date);
+    let base = (idx>=0) ? Object.assign({}, tank.entries[idx]) : {date};
+
+    // When editing, if field was provided update it; if blank, blank it out (user cleared it intentionally)
+    // When adding new / partial update of existing: only overwrite if user typed something
+    if(editingDate && editingDate===date){
+      // Full edit mode — every field is intentional
+      keys.forEach(k=>{
+        const parsed=parseFloat(raw[k]);
+        base[k] = raw[k]==='' ? null : (isNaN(parsed) ? null : parsed);
+      });
+      base.notes=raw.notes;
+    } else {
+      // Add / partial update mode — only update fields that have a value typed
+      keys.forEach(k=>{
+        if(raw[k]!==''){
+          const parsed=parseFloat(raw[k]);
+          base[k]= isNaN(parsed) ? null : parsed;
+        }
+        // if raw[k]==='' AND entry already existed, keep existing value (do nothing)
+        if(raw[k]==='' && !(k in base)){ base[k]=null; }
+      });
+      if(raw.notes!=='') base.notes=raw.notes;
+    }
+
+    base.date=date;
+
+    if(idx>=0) tank.entries[idx]=base;
+    else tank.entries.push(base);
+
+    const ok=saveTanks();
+    renderAll();
+    resetFormToAdd();
+    flashSave(ok?'Saved.':'Kept for this session — storage unavailable right now.', !ok);
+  }
+
+  // ─── EXPORT CSV ─────────────────────────────────────────────────────────────
+  function exportCSV(){
+    const tank=currentTank();
+    const list=sortedEntries(tank);
+    const headers=['Date','KH (dKH)','GH (dGH)','pH','Nitrite (ppm)','Nitrate (ppm)','Ammonia (ppm)','Temp (°F)','Notes'];
+    const rows=list.map(e=>[
+      e.date,
+      e.dkh!=null&&!isNaN(e.dkh)?e.dkh:'',
+      e.dgh!=null&&!isNaN(e.dgh)?e.dgh:'',
+      e.ph!=null&&!isNaN(e.ph)?e.ph:'',
+      e.nitrite!=null&&!isNaN(e.nitrite)?e.nitrite:'',
+      e.nitrate!=null&&!isNaN(e.nitrate)?e.nitrate:'',
+      e.ammonia!=null&&!isNaN(e.ammonia)?e.ammonia:'',
+      e.temp!=null&&!isNaN(e.temp)?e.temp:'',
+      '"'+(e.notes||'').replace(/"/g,'""')+'"'
+    ].join(','));
+    const csv=[headers.join(',')].concat(rows).join('\r\n');
+    const blob=new Blob([csv],{type:'text/csv'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=(tank.name||'tank').replace(/\s+/g,'-').toLowerCase()+'-cycle-log.csv';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); },1000);
+  }
+
+  // ─── TANK MODAL ─────────────────────────────────────────────────────────────
+  let editingTankId=null;
+
+  function openTankModal(tankId){
+    editingTankId=tankId||null;
+    const modal=document.getElementById('tankModal');
+    document.getElementById('tankModalOverlay').classList.remove('hidden');
+    document.getElementById('modalTitle').textContent=tankId?'Edit tank settings':'Add a new tank';
+
+    // Clear
+    ['tm-name','tm-vol','tm-ph-lo','tm-ph-hi','tm-kh-lo','tm-kh-hi',
+     'tm-gh-lo','tm-gh-hi','tm-temp-lo','tm-temp-hi','tm-no3-hi','tm-desc'].forEach(id=>{
+      document.getElementById(id).value='';
+    });
+
+    if(tankId){
+      const t=tanks.find(x=>x.id===tankId);
+      if(!t) return;
+      document.getElementById('tm-name').value=t.name||'';
+      document.getElementById('tm-vol').value=t.volume||'';
+      document.getElementById('tm-desc').value=t.desc||'';
+      const ov=t.paramOverrides||{};
+      const ph=ov.ph||{}, kh=ov.dkh||{}, gh=ov.dgh||{}, tmp=ov.temp||{}, no3=ov.nitrate||{};
+      const def=DEFAULT_PARAMS.reduce((acc,p)=>{acc[p.key]=p;return acc;},{});
+      const v=(key,field,def)=>key!=null?key:(def!=null?def:'');
+      document.getElementById('tm-ph-lo').value=v(ph.goodLo,null,null);
+      document.getElementById('tm-ph-hi').value=v(ph.goodHi,null,null);
+      document.getElementById('tm-kh-lo').value=v(kh.goodLo,null,null);
+      document.getElementById('tm-kh-hi').value=v(kh.goodHi,null,null);
+      document.getElementById('tm-gh-lo').value=v(gh.goodLo,null,null);
+      document.getElementById('tm-gh-hi').value=v(gh.goodHi,null,null);
+      document.getElementById('tm-temp-lo').value=v(tmp.goodLo,null,null);
+      document.getElementById('tm-temp-hi').value=v(tmp.goodHi,null,null);
+      document.getElementById('tm-no3-hi').value=v(no3.goodHi,null,null);
+    }
+  }
+
+  function closeTankModal(){
+    document.getElementById('tankModalOverlay').classList.add('hidden');
+    editingTankId=null;
+  }
+
+  function handleTankSave(ev){
+    ev.preventDefault();
+    const name=document.getElementById('tm-name').value.trim();
+    if(!name) return;
+    const vol=parseFloat(document.getElementById('tm-vol').value)||null;
+    const desc=document.getElementById('tm-desc').value.trim();
+
+    // Param overrides
+    const fv=id=>{ const v=parseFloat(document.getElementById(id).value); return isNaN(v)?null:v; };
+    const overrides={};
+    const phLo=fv('tm-ph-lo'), phHi=fv('tm-ph-hi');
+    if(phLo!=null||phHi!=null) overrides.ph={goodLo:phLo,goodHi:phHi};
+    const khLo=fv('tm-kh-lo'), khHi=fv('tm-kh-hi');
+    if(khLo!=null||khHi!=null) overrides.dkh={goodLo:khLo,goodHi:khHi};
+    const ghLo=fv('tm-gh-lo'), ghHi=fv('tm-gh-hi');
+    if(ghLo!=null||ghHi!=null) overrides.dgh={goodLo:ghLo,goodHi:ghHi};
+    const tLo=fv('tm-temp-lo'), tHi=fv('tm-temp-hi');
+    if(tLo!=null||tHi!=null) overrides.temp={goodLo:tLo,goodHi:tHi};
+    const n3Hi=fv('tm-no3-hi');
+    if(n3Hi!=null) overrides.nitrate={goodHi:n3Hi};
+
+    if(editingTankId){
+      const t=tanks.find(x=>x.id===editingTankId);
+      if(t){ t.name=name; t.volume=vol; t.desc=desc; t.paramOverrides=overrides; }
+    } else {
+      tanks.push({id:genId(), name, volume:vol, desc, phase:'cycling', paramOverrides:overrides, entries:[]});
+      currentTankId=tanks[tanks.length-1].id;
+    }
+    saveTanks();
+    closeTankModal();
+    renderAll();
+  }
+
+  // ─── INLINE HERO RENAME ─────────────────────────────────────────────────────
+  function wireHeroRename(){
+    const el=document.getElementById('heroNameEditable');
+    if(!el) return;
+    // Prevent newlines
+    el.addEventListener('keydown', function(ev){
+      if(ev.key==='Enter'){ ev.preventDefault(); el.blur(); }
+      if(ev.key==='Escape'){ el.textContent=currentTank().name; el.blur(); }
+    });
+    el.addEventListener('blur', function(){
+      const newName=(el.textContent||'').trim();
+      if(!newName){ el.textContent=currentTank().name; return; }
+      const tank=currentTank();
+      if(newName===tank.name) return;
+      tank.name=newName;
+      saveTanks();
+      // Re-render tabs only (hero already reflects the typed value)
+      renderTankTabs();
+      // No need to re-wire — wireTabEvents uses event delegation on #tankTabs container which is stable
+    });
+    // Select all on focus for easy replacement
+    el.addEventListener('focus', function(){
+      const range=document.createRange();
+      range.selectNodeContents(el);
+      const sel=window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    });
+  }
+
+  // ─── DUPLICATE TANK ─────────────────────────────────────────────────────────
+  function duplicateTank(includeEntries){
+    const src=currentTank();
+    const copy=JSON.parse(JSON.stringify(src));
+    copy.id=genId();
+    copy.name=src.name+' (copy)';
+    if(!includeEntries) copy.entries=[];
+    tanks.push(copy);
+    currentTankId=copy.id;
+    saveTanks();
+    renderAll();
+    // Open modal so user can immediately rename
+    openTankModal(copy.id);
+  }
+
+  // ─── TANK DROPDOWN ──────────────────────────────────────────────────────────
+  let dropdownTarget=null;
+
+  function openDropdown(anchorEl){
+    const dd=document.getElementById('tankDropdown');
+    dd.classList.remove('hidden');
+    const rect=anchorEl.getBoundingClientRect();
+    const appRect=document.getElementById('app').getBoundingClientRect();
+    // Position below the button, left-aligned, clamped to app width
+    let left=rect.left;
+    let top=rect.bottom+2;
+    const ddW=240;
+    if(left+ddW > appRect.right-8) left=appRect.right-ddW-8;
+    dd.style.left=left+'px';
+    dd.style.top=top+'px';
+    dropdownTarget=anchorEl;
+  }
+
+  function closeDropdown(){
+    document.getElementById('tankDropdown').classList.add('hidden');
+    dropdownTarget=null;
+  }
+
+  // ─── WIRE EVENTS ────────────────────────────────────────────────────────────
+  function wireTabEvents(){
+    // Rebind after tab re-render
+    document.getElementById('tankTabs').addEventListener('click', function(ev){
+      // ⋯ menu button
+      const menuBtn=ev.target.closest('[data-menu]');
+      if(menuBtn){ openDropdown(menuBtn); return; }
+      // Tab switch
+      const btn=ev.target.closest('[data-tank]');
+      if(!btn) return;
+      currentTankId=btn.getAttribute('data-tank');
+      resetFormToAdd();
+      document.getElementById('entryForm').classList.add('hidden');
+      document.getElementById('toggleForm').setAttribute('aria-expanded','false');
+      document.getElementById('historyTableWrap').classList.add('hidden');
+      document.getElementById('toggleHistory').setAttribute('aria-expanded','false');
+      renderAll();
+    });
+  }
+
+  function wireEvents(){
+    wireTabEvents();
+
+    document.getElementById('addTankBtn').addEventListener('click',()=>openTankModal(null));
+
+    // Hero edit tank button (dynamically added — delegate from hero)
+    document.getElementById('app').addEventListener('click', function(ev){
+      if(ev.target.closest('#editTankBtn')) openTankModal(currentTankId);
+    });
+
+    // Dropdown menu items
+    document.getElementById('tdEdit').addEventListener('click',()=>{ closeDropdown(); openTankModal(currentTankId); });
+    document.getElementById('tdCopy').addEventListener('click',()=>{ closeDropdown(); duplicateTank(true); });
+    document.getElementById('tdCopyBlank').addEventListener('click',()=>{ closeDropdown(); duplicateTank(false); });
+    document.getElementById('tdDelete').addEventListener('click',()=>{
+      closeDropdown();
+      if(tanks.length<=1){ alert('You need at least one tank — add another before deleting this one.'); return; }
+      const tank=currentTank();
+      if(!confirm('Permanently delete "'+tank.name+'" and all its readings?')) return;
+      tanks=tanks.filter(t=>t.id!==tank.id);
+      currentTankId=tanks[0].id;
+      saveTanks();
+      renderAll();
+    });
+
+    // Close dropdown on outside click or Escape
+    document.addEventListener('click', function(ev){
+      if(!document.getElementById('tankDropdown').classList.contains('hidden')){
+        if(!ev.target.closest('#tankDropdown') && !ev.target.closest('[data-menu]')) closeDropdown();
+      }
+    });
+    document.addEventListener('keydown', function(ev){
+      if(ev.key==='Escape') closeDropdown();
+    });
+
+    // Tank modal
+    document.getElementById('cancelTankModal').addEventListener('click', closeTankModal);
+    document.getElementById('tankModalOverlay').addEventListener('click', function(ev){
+      if(ev.target===this) closeTankModal();
+    });
+    document.getElementById('tankForm').addEventListener('submit', handleTankSave);
+
+    // Toggle add form
+    document.getElementById('toggleForm').addEventListener('click', function(){
+      const form=document.getElementById('entryForm');
+      const open=form.classList.contains('hidden');
+      form.classList.toggle('hidden');
+      this.setAttribute('aria-expanded', String(open));
+      if(open){
+        if(!editingDate) document.getElementById('f-date').value=todayLocal();
+      } else {
+        resetFormToAdd();
+      }
+    });
+
+    // Cancel edit
+    document.getElementById('cancelEdit').addEventListener('click', function(){
+      resetFormToAdd();
+    });
+
+    // Toggle history
+    document.getElementById('toggleHistory').addEventListener('click', function(){
+      const wrap=document.getElementById('historyTableWrap');
+      const open=wrap.classList.contains('hidden');
+      wrap.classList.toggle('hidden');
+      this.setAttribute('aria-expanded', String(open));
+      const tank=currentTank();
+      this.innerHTML=(open?'▾':'▸')+' Full log (<span id="histCount">'+tank.entries.length+'</span> entries)';
+    });
+
+    // Form submit
+    document.getElementById('entryForm').addEventListener('submit', handleSubmit);
+
+    // Phase select
+    document.getElementById('phaseSelect').addEventListener('change', function(){
+      const tank=currentTank();
+      tank.phase=this.value;
+      saveTanks();
+      renderAll();
+    });
+
+    // Strip chips → scroll to card
+    document.getElementById('statusStrip').addEventListener('click', function(ev){
+      const btn=ev.target.closest('[data-jump]');
+      if(!btn) return;
+      const card=document.getElementById('card-'+btn.getAttribute('data-jump'));
+      if(card) card.scrollIntoView({behavior:'smooth', block:'center'});
+    });
+
+    // History table: edit + delete
+    document.getElementById('historyTableWrap').addEventListener('click', async function(ev){
+      const editBtn=ev.target.closest('[data-edit]');
+      if(editBtn){
+        const date=editBtn.getAttribute('data-edit');
+        loadEntryIntoForm(date);
+        return;
+      }
+      const delBtn=ev.target.closest('[data-del]');
+      if(delBtn){
+        const date=delBtn.getAttribute('data-del');
+        if(!confirm('Remove the '+prettyDate(date)+' entry?')) return;
+        const tank=currentTank();
+        tank.entries=tank.entries.filter(e=>e.date!==date);
+        saveTanks();
+        renderAll();
+      }
+    });
+
+    // Export CSV
+    document.getElementById('exportCSV').addEventListener('click', exportCSV);
+
+    // Reset this tank
+    document.getElementById('resetBtn').addEventListener('click', function(){
+      const tank=currentTank();
+      const seed=SEED_TANKS.find(s=>s.id===tank.id);
+      if(!confirm('Reset "'+tank.name+'" back to seed data? This cannot be undone.')) return;
+      if(seed){
+        tank.entries=JSON.parse(JSON.stringify(seed.entries));
+        tank.phase=seed.phase;
+      } else {
+        tank.entries=[];
+        tank.phase='cycling';
+      }
+      saveTanks();
+      resetFormToAdd();
+      renderAll();
+    });
+
+    // Add "Edit tank" button to hero dynamically
+    const titleRow = document.querySelector('.hero-inner');
+    if(titleRow){
+      const h1=document.getElementById('heroTitle');
+      const wrap=document.createElement('div');
+      wrap.className='hero-title-row';
+      h1.parentNode.insertBefore(wrap, h1);
+      wrap.appendChild(h1);
+      const editBtn=document.createElement('button');
+      editBtn.id='editTankBtn';
+      editBtn.type='button';
+      editBtn.className='edit-tank-btn';
+      editBtn.textContent='Edit tank';
+      wrap.appendChild(editBtn);
+    }
+  }
+
+  // ─── INIT ───────────────────────────────────────────────────────────────────
+  function init(){
+    loadTanks();
+    currentTankId=tanks[0]?.id;
+    if(!storageOK){
+      document.getElementById('storageNote').textContent="Storage isn't available — your entries will reset if you reload.";
+    }
+    wireEvents();
+    renderAll();
+  }
+
+  init();
+})();
+</script>
+</body></html>
